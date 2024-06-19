@@ -58,6 +58,68 @@
       {
         "type": "object",
         "required": [
+          "list_fractional_nft"
+        ],
+        "properties": {
+          "list_fractional_nft": {
+            "type": "object",
+            "required": [
+              "contract_address",
+              "price_per_share",
+              "shares",
+              "token_id"
+            ],
+            "properties": {
+              "contract_address": {
+                "$ref": "#/definitions/Addr"
+              },
+              "price_per_share": {
+                "$ref": "#/definitions/Uint128"
+              },
+              "shares": {
+                "$ref": "#/definitions/Uint128"
+              },
+              "token_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "buy_fractional_nft"
+        ],
+        "properties": {
+          "buy_fractional_nft": {
+            "type": "object",
+            "required": [
+              "contract_address",
+              "shares",
+              "token_id"
+            ],
+            "properties": {
+              "contract_address": {
+                "$ref": "#/definitions/Addr"
+              },
+              "shares": {
+                "$ref": "#/definitions/Uint128"
+              },
+              "token_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
           "buy"
         ],
         "properties": {

@@ -13,10 +13,8 @@ use cosmwasm_std::{
     StdResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw20::{AllowanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
-use cw2981_royalties::{
-    msg::RoyaltiesInfoResponse, ExecuteMsg as Cw2981ExecuteMsg, QueryMsg as Cw2981QueryMsg,
-};
-use cw721::{Cw721QueryMsg, Expiration as Cw721Expiration};
+
+use cw721::{Cw721QueryMsg, Expiration as Cw721Expiration,Cw721ExecuteMsg};
 
 impl MarketplaceContract<'static> {
     pub fn validate_auction_config(&self, auction_config: &AuctionConfig) -> bool {
@@ -324,7 +322,7 @@ impl MarketplaceContract<'static> {
                 // message to transfer nft to buyer
                 let transfer_nft_msg = WasmMsg::Execute {
                     contract_addr: listing.contract_address.to_string(),
-                    msg: to_json_binary(&Cw2981ExecuteMsg::TransferNft {
+                    msg: to_json_binary(&Cw721ExecuteMsg::TransferNft {
                         recipient: listing.buyer.clone().unwrap().into_string(),
                         token_id: listing.token_id.clone(),
                     })?,
@@ -632,7 +630,7 @@ impl MarketplaceContract<'static> {
                     // message to transfer nft to offerer
                     let transfer_nft_msg = WasmMsg::Execute {
                         contract_addr: contract_address.clone().to_string(),
-                        msg: to_json_binary(&Cw2981ExecuteMsg::TransferNft {
+                        msg: to_json_binary(&Cw721ExecuteMsg::TransferNft {
                             recipient: order_components.offerer.clone().to_string(),
                             token_id: token_id.clone().unwrap(),
                         })?,
@@ -740,135 +738,7 @@ impl MarketplaceContract<'static> {
         sender: &Addr,
         recipient: &Addr,
     ) -> Vec<CosmosMsg> {
-        // create empty vector of CosmosMsg
-        let mut res_messages: Vec<CosmosMsg> = vec![];
-
-        // Extract information from token
-        let (is_native, token_info, amount) = match token {
-            PaymentAsset::Cw20 {
-                contract_address: token_address,
-                amount,
-            } => (false, token_address.to_string(), Uint128::from(amount)),
-            PaymentAsset::Native { denom, amount } => (true, denom, Uint128::from(amount)),
-        };
-
-        // get cw2981 royalties info
-        let royalty_query_msg = Cw2981QueryMsg::Extension {
-            msg: cw2981_royalties::msg::Cw2981QueryMsg::RoyaltyInfo {
-                token_id: nft_id.into(),
-                sale_price: amount,
-            },
-        };
-
-        let royalty_info_rsp: Result<RoyaltiesInfoResponse, cosmwasm_std::StdError> =
-            deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-                contract_addr: nft_contract_address.to_string(),
-                msg: to_json_binary(&royalty_query_msg).unwrap(),
-            }));
-
-        let (creator, royalty_amount): (Option<Addr>, Option<Uint128>) = match royalty_info_rsp {
-            Ok(RoyaltiesInfoResponse {
-                address,
-                royalty_amount,
-            }) => {
-                if address.is_empty() || royalty_amount == Uint128::zero() {
-                    (None, None)
-                } else {
-                    (
-                        Some(deps.api.addr_validate(&address).unwrap()),
-                        Some(royalty_amount),
-                    )
-                }
-            }
-            Err(_) => (None, None),
-        };
-
-        // there is no royalty, creator is the recipient, or royalty amount is 0
-        if creator.is_none()
-            || *creator.as_ref().unwrap() == *recipient
-            || royalty_amount.is_none()
-            || royalty_amount.unwrap().is_zero()
-        {
-            match &is_native {
-                false => {
-                    // execute cw20 transfer msg from info.sender to recipient
-                    let transfer_response = WasmMsg::Execute {
-                        contract_addr: deps.api.addr_validate(&token_info).unwrap().to_string(),
-                        msg: to_json_binary(&Cw20ExecuteMsg::TransferFrom {
-                            owner: sender.to_string(),
-                            recipient: recipient.to_string(),
-                            amount,
-                        })
-                        .unwrap(),
-                        funds: vec![],
-                    };
-                    res_messages.push(transfer_response.into());
-                }
-                true => {
-                    // transfer all funds to recipient
-                    let transfer_response = BankMsg::Send {
-                        to_address: recipient.to_string(),
-                        amount: vec![Coin {
-                            denom: token_info,
-                            amount,
-                        }],
-                    };
-                    res_messages.push(transfer_response.into());
-                }
-            }
-        } else if let (Some(creator), Some(royalty_amount)) = (creator, royalty_amount) {
-            match &is_native {
-                false => {
-                    // execute cw20 transfer transfer royalty to creator
-                    let transfer_token_creator_response = WasmMsg::Execute {
-                        contract_addr: deps.api.addr_validate(&token_info).unwrap().to_string(),
-                        msg: to_json_binary(&Cw20ExecuteMsg::TransferFrom {
-                            owner: sender.to_string(),
-                            recipient: creator.to_string(),
-                            amount: royalty_amount,
-                        })
-                        .unwrap(),
-                        funds: vec![],
-                    };
-                    res_messages.push(transfer_token_creator_response.into());
-
-                    // execute cw20 transfer remaining funds to recipient
-                    let transfer_token_seller_msg = WasmMsg::Execute {
-                        contract_addr: deps.api.addr_validate(&token_info).unwrap().to_string(),
-                        msg: to_json_binary(&Cw20ExecuteMsg::TransferFrom {
-                            owner: sender.to_string(),
-                            recipient: recipient.to_string(),
-                            amount: amount - royalty_amount,
-                        })
-                        .unwrap(),
-                        funds: vec![],
-                    };
-                    res_messages.push(transfer_token_seller_msg.into());
-                }
-                true => {
-                    // transfer royalty to creator
-                    let transfer_token_creator_response = BankMsg::Send {
-                        to_address: creator.to_string(),
-                        amount: vec![Coin {
-                            denom: token_info.clone(),
-                            amount: royalty_amount,
-                        }],
-                    };
-                    res_messages.push(transfer_token_creator_response.into());
-
-                    // transfer remaining funds to recipient
-                    let transfer_token_seller_msg = BankMsg::Send {
-                        to_address: recipient.to_string(),
-                        amount: vec![Coin {
-                            denom: token_info,
-                            amount: amount - royalty_amount,
-                        }],
-                    };
-                    res_messages.push(transfer_token_seller_msg.into());
-                }
-            }
-        }
-
-        res_messages
+       
+        unimplemented!()
     }
 }

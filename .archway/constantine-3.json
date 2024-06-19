@@ -1,0 +1,16 @@
+{
+  "deployments": [
+    {
+      "action": "store",
+      "txhash": "CBF29A1593655697DC6F0224C8863A6B58E5A4604F3A486708670F09C9F4A5D3",
+      "wasm": {
+        "codeId": 3000,
+        "checksum": "f430591b0fb4f37de5793492b8093a23bdc165311de2cf3ee4b460e068bba6cb"
+      },
+      "contract": {
+        "name": "nft-marketplace",
+        "version": "0.1.1"
+      }
+    }
+  ]
+}
