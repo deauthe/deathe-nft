@@ -1,0 +1,3 @@
+cea5cbe62e3e90cfa68ce27294b2626370056d3cefb00eae0f8d8ced0a029e18  /target/wasm32-unknown-unknown/release/cw2981_royalties.wasm
+d9e5cefa0555cae62b0f9863a091fe11ee7691322a332b7f135c253d39da14f0  /target/wasm32-unknown-unknown/release/deauthe.wasm
+d2fa7720bc4ba397ef2a1ff1bad7dcd13060fc465cd453bfee0343a4355112e0  /target/wasm32-unknown-unknown/release/nft_marketplace.wasm
